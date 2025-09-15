@@ -1,0 +1,16 @@
+# Visual Studio files
+.vs/
+*.user
+*.suo
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+*.DS_Store
+Thumbs.db
+# --- Custom folders to ignore ---
+ShapeNetCore/
+pytorch3d/
+*.pth
