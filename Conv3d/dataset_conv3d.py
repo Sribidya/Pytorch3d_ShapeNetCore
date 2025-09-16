@@ -49,7 +49,7 @@ def read_binvox(filepath):
 # Dataset class
 # ----------------------
 class ShapeNetBinvoxDataset(Dataset):
-    def __init__(self, root_dir, transform=None):
+    def __init__(self, root_dir, transform=None, preload=False): 
         self.transform = transform
         # find all .binvox files recursively
         self.files = glob.glob(os.path.join(root_dir, "**/*.binvox"), recursive=True)
