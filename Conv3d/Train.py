@@ -5,21 +5,18 @@ from dataset_conv3d import  ShapeNetBinvoxDataset  # import your Dataset class
 from Conv3dmodel import VoxelCNN  # import the CNN class
 import torch.optim as optim
 import torch.nn as nn
+import random
+import json
+from dataset_conv3d import get_splits, inspect_split
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Load dataset
-dataset = ShapeNetBinvoxDataset(root_dir="ShapeNetCore")
-indices = list(range(len(dataset)))
-labels = dataset.labels_idx
 
-#Train/Validation Split
-train_idx, val_idx = train_test_split(indices, test_size=0.2, stratify=labels, random_state=42)
+dataset, train_loader, val_loader, train_idx, val_idx = get_splits(
+    root="../ShapeNetCore", val_size=0.2, seed=42, batch_size=2
+)
 
-train_set = Subset(dataset, train_idx)
-val_set = Subset(dataset, val_idx)
-train_loader = DataLoader(train_set, batch_size=2, shuffle=True)
-val_loader = DataLoader(val_set, batch_size=2, shuffle=False)
+inspect_split(dataset, train_idx, val_idx)
 
 # Create model
 model = VoxelCNN(num_classes=len(dataset.classes)).to(device)
@@ -59,8 +56,9 @@ def evaluate(model, loader, criterion, device):
             total += labels.size(0)
     return running_loss / total, correct / total
 # Training loop
-num_epochs = 20
+num_epochs = 2
 best_val_acc = 0.0
+target_acc = 0.98  # stop when val acc >= 98%
 
 for epoch in range(num_epochs):
     train_loss, train_acc = train_one_epoch(model, train_loader, optimizer, criterion, device)
@@ -74,6 +72,13 @@ for epoch in range(num_epochs):
     if val_acc > best_val_acc:
         best_val_acc = val_acc
         torch.save(model.state_dict(), "best_voxelcnn.pth")
+        with open("classes.json", "w") as f:
+          json.dump(dataset.classes, f)  # save class names
+        print(f"New best model saved (Val Acc: {val_acc:.4f})")
+
+    # Early stopping condition
+    if val_acc >= target_acc:
+        print(f"Target accuracy {target_acc*100:.1f}% reached at epoch {epoch+1}. Stopping training.")
+        break
         
-        
-print("Model saved to voxelcnn.pth")
+print("Model saved to voxelcnn.pth")       

@@ -1,13 +1,15 @@
-import os
+﻿import os
 import glob
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from torch.utils.data import Subset
-
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
 import torch.optim as optim
+import random
+from torch.utils.data import Subset
+from sklearn.model_selection import train_test_split
 
 
 # ----------------------
@@ -51,13 +53,15 @@ def read_binvox(filepath):
 class ShapeNetBinvoxDataset(Dataset):
     def __init__(self, root_dir, transform=None, preload=False): 
         self.transform = transform
+        self.preload = preload
         # find all .binvox files recursively
         self.files = glob.glob(os.path.join(root_dir, "**/*.binvox"), recursive=True)
         if len(self.files) == 0:
             raise RuntimeError(f"No .binvox files found under {root_dir}")
 
         # use category folder (02808440, etc.) as label
-        self.labels = [os.path.normpath(f).split(os.sep)[1] for f in self.files]
+        #self.labels = [os.path.normpath(f).split(os.sep)[1] for f in self.files]
+        self.labels = [os.path.normpath(f).split(os.sep)[-4] for f in self.files]
         self.classes = sorted(set(self.labels))
         self.class_to_idx = {cls: i for i, cls in enumerate(self.classes)}
         self.labels_idx = [self.class_to_idx[lbl] for lbl in self.labels]
@@ -72,11 +76,11 @@ class ShapeNetBinvoxDataset(Dataset):
             vox = self.transform(vox)
         return torch.from_numpy(vox), self.labels_idx[idx]
 
-# ----------------------
-# Example usage
-# ----------------------
+
+#verify the dataset and visualize samples
+
 if __name__ == "__main__":
-    root = "ShapeNetCore"  # path to dataset folder
+    root = "../ShapeNetCore"  # path to dataset folder
     dataset = ShapeNetBinvoxDataset(root)
 
     print("Classes:", dataset.classes)
@@ -103,3 +107,59 @@ if __name__ == "__main__":
         plt.imshow(vox[i], cmap="viridis")
         plt.title(f"Slice {i}")
         plt.show()
+
+    # Downsample for visualization (from 128³ → 32³)
+    vox = torch.from_numpy(vox)
+    vox_down = F.interpolate(
+        vox.unsqueeze(0).unsqueeze(0).float(), 
+        size=(32, 32, 32), 
+        mode="trilinear", 
+        align_corners=False
+    )
+    vox_down = (vox_down > 0.5).squeeze().numpy()  # binarize, shape (32,32,32)
+
+    # Plot as voxels
+    fig = plt.figure(figsize=(6,6))
+    ax = fig.add_subplot(111, projection="3d")
+    ax.voxels(vox_down, facecolors="blue", edgecolor="k")
+    plt.title(f"3D Voxel Visualization - Class {dataset.classes[label]}")
+    plt.show()
+
+
+
+def get_splits(root="../ShapeNetCore", val_size=0.2, seed=42, batch_size=4):
+    # Load dataset
+    dataset = ShapeNetBinvoxDataset(root_dir="../ShapeNetCore")
+    indices = list(range(len(dataset)))
+    labels = dataset.labels_idx
+
+    # Stratified train/val split
+    train_idx, val_idx = train_test_split(
+        indices, test_size=0.2, stratify=labels, random_state=42
+    )
+
+    train_set = Subset(dataset, train_idx)
+    val_set = Subset(dataset, val_idx)
+
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
+
+    return dataset, train_loader, val_loader, train_idx, val_idx
+
+# random checks on the splits
+def inspect_split(dataset, train_idx, val_idx, num_samples=3, random_checks=10):
+    
+    print("Train size:", len(train_idx), "Val size:", len(val_idx))
+    print("Unique train labels:", set([dataset.labels_idx[i] for i in train_idx]))
+    print("Unique val labels:", set([dataset.labels_idx[i] for i in val_idx]))
+
+    # Check voxels are not empty
+    for i in range(num_samples):
+        vox, lbl = dataset[i]
+        print(f"Sample {i} - Label: {lbl}, Voxel sum: {vox.sum().item()}")
+
+    # Check random samples
+    for i in random.sample(range(len(dataset)), random_checks):
+        vox, lbl = dataset[i]
+        print(f"Sample {i} | Label: {lbl} ({dataset.classes[lbl]}) "
+              f"| Non-zeros: {(vox > 0).sum().item()}")
