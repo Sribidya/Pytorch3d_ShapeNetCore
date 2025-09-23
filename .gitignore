@@ -13,5 +13,5 @@ Thumbs.db
 # --- Custom folders to ignore ---
 ShapeNetCore/
 pytorch3d/
-../to be removed/
+**/to be removed/
 *.pth
