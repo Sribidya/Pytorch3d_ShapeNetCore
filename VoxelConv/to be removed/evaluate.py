@@ -69,9 +69,10 @@ for y_true, y_pred in zip(all_labels, all_preds):
 acc_per_class = [c / t if t > 0 else 0 for c, t in zip(correct, total)]
 
 plt.figure(figsize=(8, 6))
-plt.bar(np.arange(len(dataset.classes)), acc_per_class, color="skyblue")
+plt.bar(np.arange(len(dataset.classes)), acc_per_class)
 plt.xticks(np.arange(len(dataset.classes)), dataset.classes, rotation=45)
 plt.ylabel("Accuracy")
+plt.xlabel("Class")
 plt.title("Per-Class Accuracy")
 plt.tight_layout()
 plt.savefig("per_class_accuracy.png")  
