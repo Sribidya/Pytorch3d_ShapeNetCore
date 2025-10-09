@@ -15,3 +15,4 @@ ShapeNetCore/
 pytorch3d/
 **/to be removed/
 *.pth
+*.png
